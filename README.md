@@ -30,6 +30,12 @@ And place the rfid/nfc tag to the reader, you'll see the eggs number goes up.
 node eggs.js server
 ```
 
+## Need Help?
+
+* lexon: lexonleed@gmail.com
+
+0. [How to setup Raspberry Pi and install eris](https://github.com/shuangjj/docs.erisindustries.com/blob/aboutiot/tutorials/install-eris-arm.md)
+
 ## Known Problems
 
 ## Credits
