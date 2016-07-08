@@ -1,0 +1,25 @@
+{
+  "name": "eggbank",
+  "version": "0.0.1",
+  "dependencies": {
+    "eris-contracts": "^0.13.1",
+    "ndef":"^0.1.2",
+    "restify":"^4.1.1",
+    "nfc": "^0.3.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eris-ltd/urvogel.git"
+  },
+  "license": "GPL-3.0",
+  "description": "Chickens on a Chain - Eris/IoT",
+  "bugs": {
+    "url": "https://github.com/eris-ltd/urvogel/issues"
+  },
+  "homepage": "https://github.com/eris-ltd/urvogel#readme",
+  "main": "eggbank.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Lexon"
+}
