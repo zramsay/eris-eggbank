@@ -2,6 +2,11 @@
 # eggbank
 'EggBank' on a Chain - Eris/IoT
 
+*Current Status:*
+- Implemented RFID triggered contract execution.
+- Add egg count on the eggchain by putting the egg RFID tag on the reader.
+- Check egg balance on the eggchain by http://52.42.15.191:56658/eggs/getInventory
+
 ## Hardware Requirements
 * Raspberry Pi 2/Pi 3
 * [NFC/RFID reader](https://www.adafruit.com/product/364)
@@ -29,6 +34,7 @@ And place the rfid/nfc tag to the reader, you'll see the eggs number goes up.
 ```bash
 node eggs.js server
 ```
+You can check the current egg number by the URL http://your_ip_addr:56658/eggs/getInventory.
 
 ## Need Help?
 
