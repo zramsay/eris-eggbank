@@ -1,8 +1,7 @@
 /*
 ********************************************************************************
-*   Urvogel - the eggs on the blockchain
+*   eggs bank on the blockchain
 *******************************************************************************/
-
 
 var fs = require ('fs')
     , util = require('util')
@@ -15,22 +14,25 @@ var erisC = require('eris-contracts')
 
 var appName = "eggbank"
     , chainName = "eggchain"
-    , contractMngrName = "eggchain_developer_000"
     ;
 
-var contractRoot = "./contract/";
+var contractRoot = "./contract/"
+    , contractName = "deployStorageK"
+    , contractMngrName = "eggchain_developer_000"
+    ;
 
 var erisdbURL = "http://localhost:1337/rpc";
 
 //-$- get the abi and deployed data squared away -$-
 var contractData = require( contractRoot + appName + '/epm.json');
-var eggsContractAddress = contractData["deployStorageK"];
+var eggsContractAddress = contractData[contractName];
+
 var eggsAbi = JSON.parse( fs.readFileSync(contractRoot + appName + "/abi/" 
                           + eggsContractAddress) );
 
 //-$- properly instantiate the contract objects manager using the erisdb URL
 // and the account data (which is a temporary hack) -$-
-var accountData = require("./contract/" + appName + "/accounts.json");
+var accountData = require(contractRoot + appName + "/accounts.json");
 var contractsManager = erisC.newContractManagerDev(erisdbURL, 
                                             accountData[contractMngrName]);
 

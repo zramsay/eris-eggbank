@@ -5,7 +5,8 @@
     "eris-contracts": "^0.13.1",
     "ndef":"^0.1.2",
     "restify":"^4.1.1",
-    "nfc": "^0.3.1"
+    "nfc": "^0.3.3",
+    "prompt": "1.0.0"
   },
   "repository": {
     "type": "git",

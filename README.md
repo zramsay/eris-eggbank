@@ -26,13 +26,13 @@
 ### Throw in your eggs
 
 ```bash
-sudo node eggs.js
+sudo node eggbank.js
 ```
 And place the rfid/nfc tag to the reader, you'll see the eggs number goes up.
 
 ### Start eggbank server
 ```bash
-node eggs.js server
+node eggbank.js server
 ```
 You can check the current egg number by the URL http://your_ip_addr:56658/eggs/getInventory.
 
