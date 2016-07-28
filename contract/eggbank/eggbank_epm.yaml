@@ -1,0 +1,9 @@
+jobs:
+
+- name: deployEggbank
+  job:
+    deploy:
+      contract: eggbank.sol
+      wait: true
+
+

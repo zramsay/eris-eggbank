@@ -54,35 +54,6 @@ function makeTextTagBuffer(text) {
 }
 
 //------------------------------------------------------------------------------
-// Convert node Buffer object to hex string.
-//
-// Args:
-//  buf (Buffer): Node buffer object.
-//  sep (string): Delimiter for adjacent hex.
-//
-// Returns:
-//  hex string.
-//------------------------------------------------------------------------------
-function bufToHexString(buf, sep) {
-  var hex='';
-  for (var e of buf.entries()) {
-    hex += ('0' + e[1].toString(16)).substr(-2) + sep;
-  }
-  return hex;
-}
-
-//------------------------------------------------------------------------------
-// Print tag buffer in hex string format.
-//------------------------------------------------------------------------------
-function printTagBuffer(buf) {
-  for (var i=0; i<buf.length/16; i++) {
-    console.log('Block[' + i + '] ' + bufToHexString(buf.slice(i*16, (i+1)*16), ' '));
-  }
-  if (16*i < buf.length)
-    console.log('Block[' + i + '] ' + bufToHexString(buf.slice(i*16, buf.length)));
-}
-
-//------------------------------------------------------------------------------
 // Test function
 //------------------------------------------------------------------------------
 function test(text2write) {
@@ -100,7 +71,7 @@ function test(text2write) {
         console.log("Tag data block size: " + tag.data.length);
         console.log(util.inspect(tag.data, {depth: null}));
 
-        printTagBuffer(tag.data);      
+        nfc.printTagBuffer(tag.data);      
         // Example output:
         // Block[0] 04 11 11 8c ea 79 4d 81 5f 48 00 00 e1 10 6d 00 
         //         +---+---+------------  --------------------+
@@ -153,24 +124,55 @@ function test(text2write) {
       if (!!tag.data)  {
         tag.data.copy(tagdata, datalen);
         datalen += tag.data.length; 
+
         var tlvs = nfc.parse(tagdata.slice(16));
         if (tlvs[tlvs.length-1].type === 0xfe) {
-          //printTagBuffer(tagdata);
+          //nfc.printTagBuffer(tagdata);
           break;
         }
       }
     }
-    console.log("Original text: " + tlvs[0].ndef[0].value + "\n\n");
 
-    // -$- Write *eggs* -$-
-    var longtext = "This is a very long long long long long long long long long long long long long message";
-    var buf = makeTextTagBuffer(longtext);
-    console.log(bufToHexString(buf, ' '));
+    // -$- Manufacture block -$- 
+    manudata = nfc.parseManufactureBlk(tagdata.slice(0, 16));
+    console.log("uid: " + nfc.bufToHexString(new Buffer(manudata.uid), ' '));
+    console.log("check byte 0: " + ('0' + manudata.cb0.toString(16)).substr(-2));
+    console.log("check byte 1: " + ('0' + manudata.cb1.toString(16)).substr(-2));
+    console.log("internal: " + ('0' + manudata.internal.toString(16)).substr(-2));
+    console.log("lock bytes: " + nfc.bufToHexString(new Buffer(manudata.lock), ' '));
+    console.log("capability container: " + nfc.bufToHexString(new Buffer(manudata.cc), ' '));
+    console.log();
 
-    var np = nfcdev.write(buf);
-    console.log("Wrote " + np + " pages");
+    // -$- Read JSON data -$-
+    console.log("Original text: " + tlvs[0].ndef[0].value);
+    try {
+      infoObj = JSON.parse(tlvs[0].ndef[0].value);
+      console.log(infoObj); 
+      console.log();
+    } catch (e) {
+    } finally {
+    
 
-    nfcdev.stop();
+      //*
+      // -$- Write *eggs* -$-
+      var text = "hello";
+      var json = JSON.stringify({
+        "name": "eggs",
+        "location": "Jersey City",
+        "Expiration": "10/10/16",
+        "Boxed date": "7/26/2016",
+        "NOE": 18
+      }, null, '\t');
+
+      var buf = makeTextTagBuffer(json);
+      console.log(nfc.bufToHexString(buf, ' '));
+
+      var np = nfcdev.write(buf);
+      console.log("Wrote " + np + " pages");
+      //*/
+
+      nfcdev.stop();
+    }
   }
 
 }

@@ -17,7 +17,7 @@ var appName = "eggbank"
     ;
 
 var contractRoot = "./contract/"
-    , contractName = "deployStorageK"
+    , contractName = "deployEggbank"
     , contractMngrName = "eggchain_developer_000"
     ;
 
@@ -27,7 +27,7 @@ var erisdbURL = "http://localhost:1337/rpc";
 var contractData = require( contractRoot + appName + '/epm.json');
 var eggsContractAddress = contractData[contractName];
 
-var eggsAbi = JSON.parse( fs.readFileSync(contractRoot + appName + "/abi/" 
+var eggsAbi = JSON.parse( fs.readFileSync(contractRoot + appName + "/eggbank_abi/" 
                           + eggsContractAddress) );
 
 //-$- properly instantiate the contract objects manager using the erisdb URL
@@ -40,26 +40,17 @@ var contractsManager = erisC.newContractManagerDev(erisdbURL,
 var eggsContract = contractsManager.newContractFactory(eggsAbi)
     .at(eggsContractAddress);
 
-//------------------------------------------------------------------------------
-// Get current outstanding number of eggs in contract
-//------------------------------------------------------------------------------ 
-function getValue(callback) {
-    eggsContract.get(function(error, result){
-        if (error) { throw error }
-        console.log("Egg number now is:\t\t\t" + result.toNumber());
-        callback(result);
+function registerEggCarton(uid, cartonInfo, callback) {
+    eggsContract.registerCarton(uid, cartonInfo.name, cartonInfo.location, 
+            new Date(cartonInfo.Expiration).getTime(), 
+            new Date(cartonInfo['Boxed date']).getTime(),
+            cartonInfo.NOE, 
+            function(error, errCode) {
+        if (error) return;
+        callback(errCode);
     });
 }
 
-//------------------------------------------------------------------------------
-// Set egg number in eggs contract
-//------------------------------------------------------------------------------
-function setValue(value) {
-    eggsContract.set(value, function(error, result){
-        if (error) { throw error }
-        getValue(function(){});
-    });
-}
 
 //------------------------------------------------------------------------------
 // Read and process the RFID value
@@ -123,8 +114,8 @@ function startEggServer() {
     server.use(restify.queryParser());                                                                          
     server.use(restify.bodyParser({mapParams: true, mapFiles: true}));              
                                                                                                                 
-    server.get('/eggs/:getInventory', function(req, res, next){ 
-        eggsContract.get(function(error, result){
+    server.get('/eggs/total', function(req, res, next){ 
+        eggsContract.getEggCount(function(error, result){
             if (error) {
                 res.send(500, error);
                 return next();
@@ -134,9 +125,24 @@ function startEggServer() {
             return next()
         });
     });
-    server.listen(56658);
-    console.log("server running at 0.0.0.0:56658");
+    server.listen(56659);
+    console.log("server running at 0.0.0.0:56659");
 }
+
+function isEggTag(tagval) {                                                     
+    try {                                                                       
+        jsonObj = JSON.parse(tagval);                                           
+    } catch (e) {                                                               
+        return false;                                                           
+    }                                                                           
+                                                                                
+    return jsonObj.hasOwnProperty('name') && jsonObj.name === "eggs";           
+}    
+
+var   NO_ERROR = 0
+    , RESOURCE_NOT_FOUND = 1001
+    , RESOURCE_ALREADY_EXISTS = 1002
+    ;
 
 //-$- Main entry -$-
 var args = process.argv.slice(2);
@@ -145,7 +151,42 @@ if (args.length > 0 &&  args[0] == "server") {
 } else {
     var devices = nfc.scan();
     for (var deviceID in devices) {
-        read(deviceID);
+        //read(deviceID);
+         var nfcdev = new nfc.NFC();                                                                             
+         nfcdev.start(deviceID);                                                                                 
+         nfc.readTag(nfcdev, function(tagdata) {                                                                 
+             // -$- Manufacture block -$-                                                
+             manudata = nfc.parseManufactureBlk(tagdata.slice(0, 16));                   
+             console.log("uid: " + nfc.bufToHexString(new Buffer(manudata.uid), ' '));       
+             console.log("check byte 0: " + ('0' + manudata.cb0.toString(16)).substr(-2));
+             console.log("check byte 1: " + ('0' + manudata.cb1.toString(16)).substr(-2));
+             console.log("internal: " + ('0' + manudata.internal.toString(16)).substr(-2));
+             console.log("lock bytes: " + nfc.bufToHexString(new Buffer(manudata.lock), ' '));
+             console.log("capability container: " + nfc.bufToHexString(new Buffer(manudata.cc), ' '));
+             console.log();                                                                                      
+
+             // -$- Read JSON data -$-                                                   
+             var tlvs = nfc.parse(tagdata.slice(16));                                                            
+             tagval = tlvs[0].ndef[0].value;                                                                     
+             console.log("Original text: " + tagval);                                                            
+             if (!isEggTag(tagval)) {                                                                            
+                 console.log("It's not an egg carton tag!!!");
+                 nfcdev.stop();                                                                                  
+                 return;                                                                                         
+             }                                                                                                   
+
+             var infoObj = JSON.parse(tagval);                                                                       
+             var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
+             registerEggCarton(cartonUID, infoObj, function (errCode) {
+                 if (errCode == NO_ERROR) {
+                     console.log("Congrats! Registered  " + cartonUID);
+                 } else if (errCode == RESOURCE_ALREADY_EXISTS) {
+                     console.log("Carton " + cartonUID + " already exists!!");
+                 }
+             });
+
+             nfcdev.stop();
+         });
     }
 }
 
