@@ -106,6 +106,7 @@ var NO_ERROR = 0
     , RESOURCE_NOT_FOUND = 1001
     , RESOURCE_ALREADY_EXISTS = 1002
     , ACCESS_DENIED = 2000
+    , ARRAY_INDEX_OUT_OF_BOUNDS = 3100 
     ;
 
 var errors = {};
@@ -113,6 +114,7 @@ errors[NO_ERROR] = "Successfully";
 errors[RESOURCE_NOT_FOUND] = "Resource not found";
 errors[RESOURCE_ALREADY_EXISTS] = "Resource already exists";
 errors[ACCESS_DENIED] = "Access denied";
+errors[ARRAY_INDEX_OUT_OF_BOUNDS] = "Index out of bounds";
 
 //------------------------------------------------------------------------------
 // Start egg server to verify eggs.
@@ -208,6 +210,31 @@ function startEggServer() {
         });
     });
 
+    server.get('/eggs/get/event/:index', function (req, res, next) {
+        var eggid = req.query.eggid;
+        eggsContract.getCartonEvent(eggid, req.params.index, function (error, result) {
+            if (error) {
+                res.send(500, error);
+                return next;
+            }
+            var errCode = result[0];
+            var etype = result[1];
+            var actor = result[2];
+            if (errCode == NO_ERROR) {
+                var json = JSON.stringify( {
+                    'etype': etype,
+                    'actor': actor
+
+                }, null, '\t');
+                res.send(200, json);
+                return next;
+            } else {
+                res.send(200, "ERROR getting event entry. " + errors[errCode]);
+                return next();
+            }
+        });
+    });
+
     server.listen(56659);
     console.log("server running at 0.0.0.0:56659");
 }
@@ -257,9 +284,9 @@ if (args.length > 0 &&  args[0] == "server") {
              var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
              registerEggCarton(cartonUID, infoObj, function (errCode) {
                  if (errCode == NO_ERROR) {
-                     console.log("Congrats! Registered  " + cartonUID);
-                 } else if (errCode == RESOURCE_ALREADY_EXISTS) {
-                     console.log("Carton " + cartonUID + " already exists!!");
+                     console.log("Congrats! Registered egg carton  " + cartonUID);
+                 } else{
+                     console.log("ERROR registering " + cartonUID + ". " + errors[errCode]);
                  }
              });
 

@@ -2,9 +2,9 @@
  * Eggbank contract
  ******************************************************************************/
 import "errors.sol";
+import "event_tracker.sol";
 
-
-contract EggBank is Errors{
+contract EggBank is Errors, EventTracker{
     string TYPE_EGGS = "eggs";
 
     uint eggCount;
@@ -17,8 +17,10 @@ contract EggBank is Errors{
         uint noe;   // -$- Number of eggs -$-
         bool exists;
         address owner;
+        history hist;
     }
     mapping(string => carton) cartons;
+    mapping(string => history) eternal;
     
     //--------------------------------------------------------------------------
     // Constructor 
@@ -50,8 +52,9 @@ contract EggBank is Errors{
     //--------------------------------------------------------------------------
     function registerCarton(string uid, string name, string location, 
                          uint expiration, uint boxedDate, uint noe) 
-                         returns (uint error){
+                         returns (uint error) {
         if(!cartons[uid].exists) {
+            
             cartons[uid].name = name;
             cartons[uid].location = location;
             cartons[uid].expiration = expiration;
@@ -63,7 +66,14 @@ contract EggBank is Errors{
             if(stringsEqual(TYPE_EGGS, name)) {
                 eggCount = eggCount + noe;
             }             
-            
+            //*
+            uint err = registerEvent(cartons[uid].hist, msg.sender);
+            if (err != 0) {
+                cartons[uid].exists = false;
+                eggCount = eggCount - noe;
+                return err;
+            }
+            //*/
             return NO_ERROR;
         } else {
             return RESOURCE_ALREADY_EXISTS;
@@ -78,8 +88,23 @@ contract EggBank is Errors{
         if(!c.exists) return RESOURCE_NOT_FOUND;
         if (msg.sender != c.owner) return ACCESS_DENIED;
 
-        cartons[uid].exists = false;
-        eggCount -= cartons[uid].noe;
+        c.exists = false;
+        eggCount = eggCount - c.noe;
+
+        uint err = disposeEvent(c.hist, msg.sender);
+        if (err != 0) {
+            c.exists = true;
+            eggCount = eggCount + c.noe;
+            return err;
+        }
+
+        history hist = eternal[uid];
+        hist.length = c.hist.length;
+        c.hist.length = 0;
+        // -$- Copy event entries -$-
+        for (uint i = 1; i <= hist.length; i++ ) {
+            hist.events[i] = c.hist.events[i];
+        }
         return NO_ERROR;
     }
     
@@ -120,9 +145,37 @@ contract EggBank is Errors{
             if (msg.sender != c.owner) {
                 return ACCESS_DENIED;
             }
+            address privOwner = c.owner;
             c.owner = newOwner;
+
+            uint err = transferEvent(c.hist, msg.sender, newOwner); 
+            if (err != 0) {
+                c.owner = privOwner;
+                return err;
+            }
+
             return NO_ERROR;
         }
+
+    }
+    
+    //--------------------------------------------------------------------------
+    // Get carton event entry
+    //--------------------------------------------------------------------------
+    function getCartonEvent(string uid, uint idx) returns (uint error, uint etype, address actor) {
+        carton c = cartons[uid];
+        if (c.exists) {
+            if (idx > c.hist.length) return (ARRAY_INDEX_OUT_OF_BOUNDS, 0, 0);
+            event_t e = c.hist.events[idx];
+            return (NO_ERROR, e.etype, e.actor);
+        }
+
+        if (eternal[uid].length != 0) {
+            if (idx > eternal[uid].length) return (ARRAY_INDEX_OUT_OF_BOUNDS, 0, 0);
+            e = eternal[uid].events[idx];
+            return (NO_ERROR, e.etype, e.actor);
+        }
+        return (RESOURCE_NOT_FOUND, 0, 0);
     }
 
 
