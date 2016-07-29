@@ -6,7 +6,8 @@
     "ndef":"^0.1.2",
     "restify":"^4.1.1",
     "nfc": "^0.3.3",
-    "prompt": "1.0.0"
+    "prompt": "1.0.0",
+    "dateformat": "1.0.12"
   },
   "repository": {
     "type": "git",
