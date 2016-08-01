@@ -5,3 +5,4 @@
 /contract/eggbank/*abi
 /contract/eggbank/accounts.json
 /contract/eggbank/epm.json
+/prompt_history.txt
