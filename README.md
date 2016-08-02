@@ -2,11 +2,6 @@
 # eggbank
 'EggBank' on a Chain - Eris/IoT
 
-*Current Status:*
-- Implemented RFID triggered contract execution.
-- Add egg count on the eggchain by putting the egg RFID tag on the reader.
-- Check egg balance on the eggchain by http://52.42.15.191:56658/eggs/getInventory
-
 ## Hardware Requirements
 * Raspberry Pi 2/Pi 3
 * [NFC/RFID reader](https://www.adafruit.com/product/364)
@@ -28,13 +23,51 @@
 ```bash
 sudo node eggbank.js
 ```
-And place the rfid/nfc tag to the reader, you'll see the eggs number goes up.
+The default action of the `eggbank` app is to read and add the egg tag to the eggank blockchain. 
+Besides that, there are `eggbank server` for serving REST requests and `eggbank terminal` for letting user 
+interact with eggbank blockchain using commands I/F.
 
-### Start eggbank server
+### Eggbank server
 ```bash
-node eggbank.js server
+node eggbank.js server [contract mngt account] [port number]
 ```
-You can check the current egg number by the URL http://your_ip_addr:56658/eggs/getInventory.
+
+The default contract management accout is `developer_000` and default port number is `56659`. The following 
+is the supported REST requests.
+
+* Get current egg count 
+
+  http://{SERVER_IP}:{PORT}/eggs/get/total
+
+* Retrieve egg carton information
+
+  http://{SERVER_IP}:{PORT}/eggs/get/{EGGID}
+
+* Dispose egg carton
+
+  http://{SERVER_IP}:{PORT}/eggs/dispose/{EGGID}
+
+* Transfer egg carton to new owner
+
+  http://{SERVER_IP}:{PORT}/eggs/transfer?eggid={EGGID}&newOwner={NEW_ADDRESS}
+
+* Get egg event entry 
+
+  http://{SERVER_IP}:{PORT}/eggs/get/event/{EVENTID}
+
+Since `dispose` and `transfer` needs the user to be authorized user, the two open REST APIs 
+will be deprecated aftewards.
+
+### Eggbank blockchain bridge (ebb)
+```bash
+sudo node eggbank.js terminal [contract mngt account]
+```
+
+`ebb` is the terminal app to interact with the eggbank blockchain. The supported 
+commands and corresponding formats are:
+* `register`: scan and register egg carton tag.
+* `transfer {UID} [--target]`: transfer egg carton to new target.
+* `dispose {UID}`: Dispose egg carton.
 
 ## Need Help?
 

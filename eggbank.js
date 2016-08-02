@@ -133,7 +133,7 @@ errors[ARRAY_INDEX_OUT_OF_BOUNDS] = "Index out of bounds";
 //------------------------------------------------------------------------------
 // Start egg server to serve REST requests.
 //------------------------------------------------------------------------------
-function startEggServer() {
+function startEggServer(port) {
     var restify = require('restify');                                                                           
 
     var name = "Consumer Egg Tracker Server"                                                                    
@@ -249,8 +249,8 @@ function startEggServer() {
         });
     });
 
-    server.listen(56659);
-    console.log("server running at 0.0.0.0:56659");
+    server.listen(port);
+    console.log("server running at 0.0.0.0:"+port);
 }
 
 //------------------------------------------------------------------------------
@@ -426,7 +426,8 @@ loadEggContract(account);
 
 if (args.length > 0) {
     if (args[0] == "server") {
-        startEggServer();
+        var port = typeof args[2] != 'undefined' ? args[2] : 56659;
+        startEggServer(port);
     }
     else if (args[0] == "terminal") {
         startEggTerminal();
