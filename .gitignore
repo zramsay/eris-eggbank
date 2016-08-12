@@ -1,8 +1,14 @@
+# Temporary files
 *.swp
 *.swo
 
+# Libraries
 /node_modules
+
+# Contracts
 /contract/eggbank/*abi
 /contract/eggbank/accounts.json
 /contract/eggbank/epm.json
+
+# App configuration files
 /prompt_history.txt

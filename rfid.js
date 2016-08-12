@@ -25,32 +25,32 @@ prompt.get(['value'], function (error, result) {
 //------------------------------------------------------------------------------
 function makeTextTagBuffer(text) {
 
-  message = [
-    ndef.textRecord(text)
-  ];
-  bytes = ndef.encodeMessage(message);
+    message = [
+        ndef.textRecord(text)
+    ];
+    bytes = ndef.encodeMessage(message);
 
-  var buflen = bytes.length+3;
-  if (bytes.length > 0xff) buflen+=2;
+    var buflen = bytes.length+3;
+    if (bytes.length > 0xff) buflen+=2;
 
-  var buf = new Buffer(buflen);
+    var buf = new Buffer(buflen);
 
-  buf.writeUInt8(0x03, 0);
+    buf.writeUInt8(0x03, 0);
 
-  if (bytes.lenth > 0xff) {
-    buf.writeUInt8(0xff, 1);
-    buf.writeUint16LE(bytes.length, 2);
-    for (var i = 0; i < bytes.length; i++) {
-      buf.writeUInt8(bytes[i], 4+i);
+    if (bytes.lenth > 0xff) {
+        buf.writeUInt8(0xff, 1);
+        buf.writeUint16LE(bytes.length, 2);
+        for (var i = 0; i < bytes.length; i++) {
+            buf.writeUInt8(bytes[i], 4+i);
+        }
+    } else {
+        buf.writeUInt8(bytes.length, 1);
+        for (var i = 0; i < bytes.length; i++) {
+            buf.writeUInt8(bytes[i], 2+i);
+        }
     }
-  } else {
-    buf.writeUInt8(bytes.length, 1);
-    for (var i = 0; i < bytes.length; i++) {
-      buf.writeUInt8(bytes[i], 2+i);
-    }
-  }
-  buf.writeUInt8(0xfe, buflen-1);
-  return buf;
+    buf.writeUInt8(0xfe, buflen-1);
+    return buf;
 }
 
 //------------------------------------------------------------------------------

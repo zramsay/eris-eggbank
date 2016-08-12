@@ -11,6 +11,8 @@ var erisC = require('eris-contracts')
     , ndef = require('ndef')
     ;
 
+var nfctools = require('./nfctools.js');
+
 var eggsContract;
 //------------------------------------------------------------------------------
 // Load eggbank contract with contract manager account.
@@ -55,7 +57,7 @@ function loadEggContract(account) {
 //   callback: Callback function.
 //------------------------------------------------------------------------------
 function registerEggCarton(uid, cartonInfo, callback) {
-    eggsContract.registerCarton(uid, cartonInfo.name, cartonInfo.location, 
+    eggsContract.registerCarton(uid, cartonInfo.Name, cartonInfo.Location, 
             new Date(cartonInfo.Expiration).getTime(), 
             new Date(cartonInfo['Boxed date']).getTime(),
             cartonInfo.NOE, 
@@ -107,7 +109,7 @@ function scanTags(callback, verbose) {
             var infoObj = JSON.parse(tagval);                                                                       
             var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
             nfcdev.stop();
-            callback({
+            callback(nfcdev, {
                 'uid': cartonUID, 
                 'json': infoObj
             });
@@ -263,7 +265,8 @@ function isEggTag(tagval) {
         return false;                                                           
     }                                                                           
                                                                                 
-    return jsonObj.hasOwnProperty('name') && jsonObj.name === "eggs";           
+    return (jsonObj.hasOwnProperty('Name') && jsonObj.Name === "eggs") || 
+        (jsonObj.hasOwnProperty('name') && jsonObj.name === "eggs");           
 }    
 
 //------------------------------------------------------------------------------
@@ -273,7 +276,7 @@ function ebbRegister(r, token) {
     var finish = token;
     var verbose = r.flags.v;
     verbose = typeof verbose !== 'undefined' ?  verbose : false;
-    var tag = scanTags(function (tag) {
+    scanTags(function (device, tag) {
         if (!!tag) {
             registerEggCarton(tag.uid, tag.json, function(error) {
                 if (error == NO_ERROR) {
@@ -350,6 +353,34 @@ function ebbPrintResult(result) {
     console.log();
 }
 
+function ebbProvision(r, token) {
+    var finish = token;
+    var jsonFile = r.args[0];
+    var jsondata = fs.readFileSync(jsonFile, 'utf-8');
+    if (!isEggTag(jsondata)) {
+        console.log("Error, not a egg tag json file!");
+        finish();
+        return;
+    } 
+    console.log(JSON.parse(jsondata));
+    var buf = nfctools.makeTextTagBuffer(jsondata);
+    console.log(buf);
+    try {
+        var nfc = require('nfc').nfc;
+        var devices = nfc.scan();
+        for (var deviceID in devices) {
+            var nfcdev = new nfc.NFC();                                                                             
+            nfcdev.start(deviceID); 
+            var np = nfcdev.write(buf);
+            console.log("Wrote " + np + " pages");
+        }
+    } catch (e) {
+        console.log(e);
+    }
+    finish();
+
+}
+
 //------------------------------------------------------------------------------
 // Start eggbank blockchain bridge terminal app
 //------------------------------------------------------------------------------
@@ -359,7 +390,7 @@ function startEggTerminal() {
         program: "ebb",
         name: "Eggbank Blockchain Bridge",
         version: "0.0.1",
-        subcommands: ['dispose', 'help', 'register', 'transfer'],
+        subcommands: ['dispose', 'help', 'provision', 'register', 'transfer'],
         options: {
             flags: [
                 // -$- short_name, name, description -$-
@@ -373,6 +404,7 @@ function startEggTerminal() {
         },
         usages: [
             // -$- subcommand, options, positional-arguments, description, handler -$-
+            ['provision', null, ['json file'], 'Provision a tag with provided json file.', ebbProvision],
             ['register', ['[v]'], null, 'Register egg carton to eggchain.', ebbRegister],
             ['transfer', ['[target]'], ['uid'], 'Transfer egg carton.', ebbTransfer],
             ['dispose', null, ['uid'], 'Dispose egg carton.', ebbDispose],
