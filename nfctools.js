@@ -37,4 +37,57 @@ exports.makeTextTagBuffer = function(text) {
     return buf;
 }
 
+//------------------------------------------------------------------------------
+//  Scan RFID/NFC tag
+//  Args:
+//    callback: callback function with {uid, json} dictionary obj as params.
+//    verbose(bool): Display tag details or not.
+//------------------------------------------------------------------------------
+exports.scanTags = function (callback, verbose) {
+    var nfc = require('nfc').nfc;
 
+    var devices = nfc.scan();
+    for (var deviceID in devices) {
+        try {
+            var nfcdev = new nfc.NFC();                                                                             
+            nfcdev.start(deviceID);                                                                                 
+            nfc.readTag(nfcdev, function(tagdata) {                                                                 
+                // -$- Manufacture block -$-                                                
+                manudata = nfc.parseManufactureBlk(tagdata.slice(0, 16));                   
+                if(verbose) {
+                    console.log("uid: " + nfc.bufToHexString(new Buffer(manudata.uid), ' '));       
+                    console.log("check byte 0: " + ('0' + manudata.cb0.toString(16)).substr(-2));
+                    console.log("check byte 1: " + ('0' + manudata.cb1.toString(16)).substr(-2));
+                    console.log("internal: " + ('0' + manudata.internal.toString(16)).substr(-2));
+                    console.log("lock bytes: " + nfc.bufToHexString(new Buffer(manudata.lock), ' '));
+                    console.log("capability container: " + nfc.bufToHexString(new Buffer(manudata.cc), ' '));
+                    console.log();                                                                                      
+                }
+
+                // -$- Read JSON data -$-                                                   
+                var tlvs = nfc.parse(tagdata.slice(16));                                                            
+                tagval = tlvs[0].ndef[0].value;                                                                     
+                if(verbose) console.log("Original text: " + tagval);                                                            
+
+                try {                                                                       
+                    var infoObj = JSON.parse(tagval);                                                                       
+                    var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
+                    nfcdev.stop();
+                    callback(nfcdev, {
+                        'uid': cartonUID, 
+                        'json': infoObj,
+                    });
+
+                } catch (e) {                                                               
+                    console.log("It's not a carton tag!!!");
+                    nfcdev.stop();                                                                                  
+                    callback(nfcdev, null);
+
+                }
+            });
+        } catch(e) {
+            console.log(e);
+            throw e;
+        }
+    }
+}
