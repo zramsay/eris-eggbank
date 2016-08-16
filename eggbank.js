@@ -100,13 +100,17 @@ EggDirectory.prototype.start = function () {
             if (resCode == eggerrors.NO_ERROR) {
                 var name = result[1];
                 var loc = result[2];
-                var expiration = new Date(result[3].toNumber());
-                var boxedDate = new Date(result[4].toNumber());
-                var noe = result[5].toNumber;
-                var owner = result[6];
+                var type = result[3];
+                var color = result[4];
+                var expiration = new Date(result[5].toNumber());
+                var boxedDate = new Date(result[6].toNumber());
+                var noe = result[7].toNumber;
+                var owner = result[8];
                 var json = JSON.stringify( {
                     "Name": name,
                     "Location": loc,
+                    "Type": type,
+                    "Color": color,
                     "Expiration": DateFormat(expiration, "mm/dd/yyyy"),
                     "Boxed date": DateFormat(boxedDate, "mm/dd/yyyy"),
                     "NoE": noe,
@@ -216,7 +220,8 @@ EbbTerminal.prototype.ebbRegister = function(r, token) {
                 if (!!tag) {
                     var cartonInfo = tag.json;
                     _this.eggsContract.registerCarton(tag.uid, 
-                        cartonInfo.Name, cartonInfo.Location, 
+                        cartonInfo.Name, cartonInfo.Location, cartonInfo.Type,
+                        cartonInfo.Color,
                         new Date(cartonInfo.Expiration).getTime(), 
                         new Date(cartonInfo['Boxed date']).getTime(),
                         cartonInfo.NoE, 

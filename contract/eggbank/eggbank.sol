@@ -1,9 +1,13 @@
-/*******************************************************************************
+/**
  * Eggbank contract
- ******************************************************************************/
+ */
+
 import "errors.sol";
 import "event_tracker.sol";
 
+/**
+ * The Eggbank class
+ */
 contract EggBank is Errors, EventTracker{
     string TYPE_EGGS = "eggs";
 
@@ -12,6 +16,8 @@ contract EggBank is Errors, EventTracker{
     struct carton {
         string name;
         string location;
+        string color;
+        string eggType;
         uint expiration;
         uint boxedDate;
         uint noe;   // -$- Number of eggs -$-
@@ -50,13 +56,15 @@ contract EggBank is Errors, EventTracker{
     //--------------------------------------------------------------------------
     // Register egg carton
     //--------------------------------------------------------------------------
-    function registerCarton(string uid, string name, string location, 
-                         uint expiration, uint boxedDate, uint noe) 
-                         returns (uint error) {
+    function registerCarton(string uid, string name, string location, string eggType,
+                            string color, uint expiration, uint boxedDate, uint noe) 
+                            returns (uint error) {
         if(!cartons[uid].exists) {
             
             cartons[uid].name = name;
             cartons[uid].location = location;
+            cartons[uid].eggType = eggType;
+            cartons[uid].color = color;
             cartons[uid].expiration = expiration;
             cartons[uid].boxedDate = boxedDate;
             cartons[uid].noe = noe;
@@ -66,14 +74,13 @@ contract EggBank is Errors, EventTracker{
             if(stringsEqual(TYPE_EGGS, name)) {
                 eggCount = eggCount + noe;
             }             
-            //*
+
             uint err = registerEvent(cartons[uid].hist, msg.sender);
             if (err != 0) {
                 cartons[uid].exists = false;
                 eggCount = eggCount - noe;
                 return err;
             }
-            //*/
             return NO_ERROR;
         } else {
             return RESOURCE_ALREADY_EXISTS;
@@ -119,18 +126,21 @@ contract EggBank is Errors, EventTracker{
     // Retrieve the carton information 
     //--------------------------------------------------------------------------
     function getCartonInfo(string uid) returns (uint error, string name, 
-                string location, uint expiration, uint boxedDate, uint noe, 
-                                               address owner) {
+                string location, string eggType, string color, uint expiration, 
+                uint boxedDate, uint noe, address owner) {
         if(!cartons[uid].exists) error = RESOURCE_NOT_FOUND;
         else {
-            error = NO_ERROR;
             carton eggCarton = cartons[uid];
             name = eggCarton.name;
+            eggType = eggCarton.eggType;
+            color = eggCarton.color;
             location = eggCarton.location;
             expiration = eggCarton.expiration;
             boxedDate = eggCarton.boxedDate;
             noe = eggCarton.noe;
             owner = eggCarton.owner;
+
+            error = NO_ERROR;
         }
         return;
     }
