@@ -1,6 +1,7 @@
 /**
  * NFC related untility functions.
  */
+
 var ndef = require('ndef');
 
 /**
