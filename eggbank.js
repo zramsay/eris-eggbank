@@ -81,7 +81,7 @@ EggDirectory.prototype.start = function () {
                 res.send(500, error);
                 return next();
             }
-            res.send(200, "You have " + result.toNumber() + " eggs.")
+            res.send(200, "Egg bank has " + result.toNumber() + " eggs.")
             console.log("Egg number now is:\t\t\t" + result.toNumber());
             return next()
         });
@@ -119,6 +119,24 @@ EggDirectory.prototype.start = function () {
                 res.send(200, json);
             } else {
                 res.send(200, "ERROR getting egg info. " + eggerrors.getErrorMsg(resCode));
+            }
+            return next();
+        });
+    });
+
+    this.server.get('/users/get/:userAddr', function (req, res, next) {
+        var userAddr = req.params.userAddr;
+        _this.eggsContract.getUserInfo(userAddr, function (error, result) {
+            if (error) {
+                res.send(500, error);
+                return next;
+            }
+            var errCode = result[0];
+            if (errCode == eggerrors.NO_ERROR) {
+                var noe = result[1]; 
+                res.send(200, "You have " + noe + " eggs");
+            } else {
+                res.send(200, "Error getting user info. " + eggerrors.getErrorMsg(errCode));
             }
             return next();
         });
@@ -412,11 +430,11 @@ EbbTerminal.prototype.terminal = function(ctx) {
     var _this = ctx;
     var cmdline = _this.prompt('ebb > ', 'help');
     if (cmdline == 'exit') {
-        _this.prompt.history.save();
         return;
     }
 
     _this.optparser.parse(_this.argsparser(cmdline), _this).then(function (res) {
+        _this.prompt.history.save();
         _this.terminal(ctx);
     });
 }

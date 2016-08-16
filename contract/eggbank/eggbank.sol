@@ -9,11 +9,14 @@ import "event_tracker.sol";
  * The Eggbank class
  */
 contract EggBank is Errors, EventTracker{
-    string TYPE_EGGS = "eggs";
 
-    uint eggCount;
+    struct UserProfile {
+        address addr;
+        uint noe;
+        bool exists;
+    }
 
-    struct carton {
+    struct Carton {
         string name;
         string location;
         string color;
@@ -22,11 +25,17 @@ contract EggBank is Errors, EventTracker{
         uint boxedDate;
         uint noe;   // -$- Number of eggs -$-
         bool exists;
-        address owner;
+        address ownerAddr;
         history hist;
     }
-    mapping(string => carton) cartons;
+    string TYPE_EGGS = "eggs";
+
+    uint eggCount;
+
+    
+    mapping(string => Carton) cartons;
     mapping(string => history) eternal;
+    mapping(address => UserProfile) users;
     
     //--------------------------------------------------------------------------
     // Constructor 
@@ -69,16 +78,22 @@ contract EggBank is Errors, EventTracker{
             cartons[uid].boxedDate = boxedDate;
             cartons[uid].noe = noe;
             cartons[uid].exists = true;
-            cartons[uid].owner = msg.sender;
-
+            cartons[uid].ownerAddr = msg.sender;
+            UserProfile owner = users[msg.sender];
+            if (!owner.exists) {
+                owner.addr = msg.sender;
+                owner.exists = true;
+            }
             if(stringsEqual(TYPE_EGGS, name)) {
                 eggCount = eggCount + noe;
+                owner.noe = owner.noe + noe;
             }             
 
             uint err = registerEvent(cartons[uid].hist, msg.sender);
             if (err != 0) {
                 cartons[uid].exists = false;
-                eggCount = eggCount - noe;
+                eggCount -= noe;
+                owner.noe -= noe;
                 return err;
             }
             return NO_ERROR;
@@ -91,17 +106,20 @@ contract EggBank is Errors, EventTracker{
     // Dispose carton
     //--------------------------------------------------------------------------
     function disposeCarton(string uid) returns (uint error){
-        carton c = cartons[uid];
+        Carton c = cartons[uid];
         if(!c.exists) return RESOURCE_NOT_FOUND;
-        if (msg.sender != c.owner) return ACCESS_DENIED;
+        if (msg.sender != c.ownerAddr) return ACCESS_DENIED;
 
         c.exists = false;
         eggCount = eggCount - c.noe;
+        UserProfile owner = users[c.ownerAddr];
+        owner.noe -= c.noe;
 
         uint err = disposeEvent(c.hist, msg.sender);
         if (err != 0) {
             c.exists = true;
             eggCount = eggCount + c.noe;
+            owner.noe += c.noe;
             return err;
         }
 
@@ -130,7 +148,7 @@ contract EggBank is Errors, EventTracker{
                 uint boxedDate, uint noe, address owner) {
         if(!cartons[uid].exists) error = RESOURCE_NOT_FOUND;
         else {
-            carton eggCarton = cartons[uid];
+            Carton eggCarton = cartons[uid];
             name = eggCarton.name;
             eggType = eggCarton.eggType;
             color = eggCarton.color;
@@ -138,29 +156,52 @@ contract EggBank is Errors, EventTracker{
             expiration = eggCarton.expiration;
             boxedDate = eggCarton.boxedDate;
             noe = eggCarton.noe;
-            owner = eggCarton.owner;
+            owner = eggCarton.ownerAddr;
 
             error = NO_ERROR;
         }
         return;
     }
-    
+   
+    //--------------------------------------------------------------------------
+    // Retrieve user information.
+    //--------------------------------------------------------------------------
+    function getUserInfo(address addr) returns (uint error, uint noe) {
+        UserProfile u = users[addr];
+        if (!u.exists) error = RESOURCE_NOT_FOUND;
+        else {
+            noe = u.noe;
+            error = NO_ERROR;
+        }
+    }
+
     //--------------------------------------------------------------------------
     // Transfer the egg ownership to newOwner
     //--------------------------------------------------------------------------
-    function transferCarton(string uid, address newOwner) returns (uint error) {
-        carton c = cartons[uid];
+    function transferCarton(string uid, address newAddr) returns (uint error) {
+        Carton c = cartons[uid];
         if(!c.exists) return RESOURCE_NOT_FOUND;
         else {
-            if (msg.sender != c.owner) {
+            if (msg.sender != c.ownerAddr) {
                 return ACCESS_DENIED;
             }
-            address privOwner = c.owner;
-            c.owner = newOwner;
+            address privAddr = c.ownerAddr;
+            UserProfile privOwner = users[privAddr];
+            UserProfile newOwner = users[newAddr];
+            if (!newOwner.exists) {
+                newOwner.addr = newAddr;
+                newOwner.exists = true;
+            }
+            privOwner.noe -= c.noe;
+            newOwner.noe += c.noe;
 
-            uint err = transferEvent(c.hist, msg.sender, newOwner); 
+            c.ownerAddr = newAddr;
+
+            uint err = transferEvent(c.hist, msg.sender, newAddr); 
             if (err != 0) {
-                c.owner = privOwner;
+                c.ownerAddr = privAddr;
+                privOwner.noe += c.noe;
+                newOwner.noe -= c.noe;
                 return err;
             }
 
@@ -173,7 +214,7 @@ contract EggBank is Errors, EventTracker{
     // Get carton event entry
     //--------------------------------------------------------------------------
     function getCartonEvent(string uid, uint idx) returns (uint error, uint etype, address actor) {
-        carton c = cartons[uid];
+        Carton c = cartons[uid];
         if (c.exists) {
             if (idx > c.hist.length) return (ARRAY_INDEX_OUT_OF_BOUNDS, 0, 0);
             event_t e = c.hist.events[idx];

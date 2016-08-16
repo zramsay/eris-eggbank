@@ -56,6 +56,10 @@ The following is the supported REST requests.
 
   http://{SERVER_IP}:{PORT}/eggs/get/event/{EVENTID}
 
+* Get user info
+  
+  http://{SERVER_IP}:{PORT}/users/get/{USER_ADDRESS}
+
 Since `dispose` and `transfer` needs the user to be authorized user, the two open REST APIs 
 will be deprecated aftewards.
 
