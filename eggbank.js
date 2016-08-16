@@ -401,7 +401,6 @@ function EbbTerminal(contract) {
     this.prompt = require('prompt-sync')({
         history: require('prompt-sync-history')('prompt_history.txt', 100)
     });
-    this.sleep = require('sleep-async')();
     
 }
 
