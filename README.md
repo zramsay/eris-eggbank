@@ -2,38 +2,39 @@
 # eggbank
 'EggBank' on a Chain - Eris/IoT
 
-## Hardware Requirements
+## Hardware Platform
 * Raspberry Pi 2/Pi 3
 * [NFC/RFID reader](https://www.adafruit.com/product/364)
 * [NFC/RFID tags][Amazon NFC stickers]
 
 [Amazon NFC stickers]: https://www.amazon.com/gp/product/B01D8RDNZ0/ref=oh_aui_detailpage_o07_s00?ie=UTF8&psc=1
 
-## Software Requirement
-* [Hypriot Docker](http://blog.hypriot.com/downloads/)
+## Software Requirements
 * [eris](https://erisindustries.com/)
-
-## Dependency Projects
 * [node-nfc](https://github.com/camme/node-nfc)
 
-## Try The Code
+## Get Started
 
-### Throw in your eggs
+### Eggbank
 
+The default action of the `eggbank` app is to print the usage message.
 ```bash
-sudo node eggbank.js
+node eggbank.js
 ```
-The default action of the `eggbank` app is to read and add the egg tag to the eggank blockchain. 
-Besides that, there are `eggbank server` for serving REST requests and `eggbank terminal` for letting user 
-interact with eggbank blockchain using commands I/F.
+According to the help information, you can type in the `node eggbank.js directory` 
+to run a `Egg Directory` server for serving REST requests. And use `sudo eggank.js terminal` 
+to interact with eggbank blockchain using commands interfaces.
 
-### Eggbank server
+And the big picture for the use case of eggbank is shown as below
+<img src="/imgs/eggbank.png" width="500" alt="Eggbank Use Case">
+
+### Eggbank Directory
 ```bash
-node eggbank.js server [contract mngt account] [port number]
+node eggbank.js directory [contract_manager_account_name] [port_number]
 ```
 
-The default contract management accout is `developer_000` and default port number is `56659`. The following 
-is the supported REST requests.
+The default contract management accout is `developer_000` and default port number is `56659`. 
+The following is the supported REST requests.
 
 * Get current egg count 
 
@@ -58,23 +59,21 @@ is the supported REST requests.
 Since `dispose` and `transfer` needs the user to be authorized user, the two open REST APIs 
 will be deprecated aftewards.
 
-### Eggbank blockchain bridge (ebb)
+### Eggbank Blockchain Bridge (ebb)
 ```bash
-sudo node eggbank.js terminal [contract mngt account]
+sudo node eggbank.js terminal [contract_manager_account_name]
 ```
 
+The terminal commands need the root priviliege to communnicate with the NFC/RFID hardware.
 `ebb` is the terminal app to interact with the eggbank blockchain. The supported 
 commands and corresponding formats are:
-* `register`: scan and register egg carton tag.
+* `provision`: Provision the egg tag with egg profile file in json format.
+* `register`: scan and register egg carton tag to eggchain.
 * `transfer {UID} [--target]`: transfer egg carton to new target.
 * `dispose {UID}`: Dispose egg carton.
 
-## Need Help?
-
-* lexon: lexonleed@gmail.com
+## Tutorials
 
 0. [How to setup Raspberry Pi and install eris](https://github.com/shuangjj/docs.erisindustries.com/blob/aboutiot/tutorials/install-eris-arm.md)
 
-## Known Problems
 
-## Credits

@@ -1,7 +1,6 @@
-/*
-********************************************************************************
-*   eggs bank on the blockchain
-*******************************************************************************/
+/**
+ * Eggbank on the blockchain
+ */
 
 var fs = require ('fs')
     , util = require('util')
@@ -12,12 +11,15 @@ var erisC = require('eris-contracts')
     ;
 
 var nfctools = require('./nfctools.js');
+var eggerrors = require('./eggerrors.js');
 
-var eggsContract;
-//------------------------------------------------------------------------------
-// Load eggbank contract with contract manager account.
-//------------------------------------------------------------------------------
+/**
+ * Load eggbank contract with contract manager account.
+ * @param {string} account - The name of the contract manager account.
+ * @returns {Contract}
+ */
 function loadEggContract(account) {
+    var eggsContract;
     var appName = "eggbank"
         , chainName = "eggchain"
         ;
@@ -46,107 +48,35 @@ function loadEggContract(account) {
     //-$- properly instantiate the contract objects using the abi and address -$-
     eggsContract = contractsManager.newContractFactory(eggsAbi)
         .at(eggsContractAddress);
+    return eggsContract;
 
 }
 
-//------------------------------------------------------------------------------
-// Register egg carton
-// Args:
-//   uid(string): tag UID.
-//   cartonInfo(json): Carton data in json format.
-//   callback: Callback function.
-//------------------------------------------------------------------------------
-function registerEggCarton(uid, cartonInfo, callback) {
-    eggsContract.registerCarton(uid, cartonInfo.Name, cartonInfo.Location, 
-            new Date(cartonInfo.Expiration).getTime(), 
-            new Date(cartonInfo['Boxed date']).getTime(),
-            cartonInfo.NOE, 
-            function(error, errCode) {
-        if (error) {
-            console.log(error);
-            return;
-        }
-        callback(errCode);
-    });
-}
-
-//------------------------------------------------------------------------------
-//  Scan RFID/NFC tag
-//  Args:
-//    callback: callback function with {uid, json} dictionary obj as params.
-//    verbose(bool): Display tag details or not.
-//------------------------------------------------------------------------------
-function scanTags(callback, verbose) {
-    var nfc = require('nfc').nfc;
-
-    var devices = nfc.scan();
-    for (var deviceID in devices) {
-        var nfcdev = new nfc.NFC();                                                                             
-        nfcdev.start(deviceID);                                                                                 
-        nfc.readTag(nfcdev, function(tagdata) {                                                                 
-            // -$- Manufacture block -$-                                                
-            manudata = nfc.parseManufactureBlk(tagdata.slice(0, 16));                   
-            if(verbose) {
-                console.log("uid: " + nfc.bufToHexString(new Buffer(manudata.uid), ' '));       
-                console.log("check byte 0: " + ('0' + manudata.cb0.toString(16)).substr(-2));
-                console.log("check byte 1: " + ('0' + manudata.cb1.toString(16)).substr(-2));
-                console.log("internal: " + ('0' + manudata.internal.toString(16)).substr(-2));
-                console.log("lock bytes: " + nfc.bufToHexString(new Buffer(manudata.lock), ' '));
-                console.log("capability container: " + nfc.bufToHexString(new Buffer(manudata.cc), ' '));
-                console.log();                                                                                      
-            }
-
-            // -$- Read JSON data -$-                                                   
-            var tlvs = nfc.parse(tagdata.slice(16));                                                            
-            tagval = tlvs[0].ndef[0].value;                                                                     
-            if(verbose) console.log("Original text: " + tagval);                                                            
-            if (!isEggTag(tagval)) {                                                                            
-                console.log("It's not an egg carton tag!!!");
-                nfcdev.stop();                                                                                  
-                return;                                                                                         
-            }                                                                                                   
-        
-            var infoObj = JSON.parse(tagval);                                                                       
-            var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
-            nfcdev.stop();
-            callback(nfcdev, {
-                'uid': cartonUID, 
-                'json': infoObj
-            });
-        });
-    }
-}
-
-// -$- Eggbank error definitions -$-
-var NO_ERROR = 0
-    , RESOURCE_NOT_FOUND = 1001
-    , RESOURCE_ALREADY_EXISTS = 1002
-    , ACCESS_DENIED = 2000
-    , ARRAY_INDEX_OUT_OF_BOUNDS = 3100 
-    ;
-
-var errors = {};
-errors[NO_ERROR] = "Successfully";
-errors[RESOURCE_NOT_FOUND] = "Resource not found";
-errors[RESOURCE_ALREADY_EXISTS] = "Resource already exists";
-errors[ACCESS_DENIED] = "Access denied";
-errors[ARRAY_INDEX_OUT_OF_BOUNDS] = "Index out of bounds";
-
-//------------------------------------------------------------------------------
-// Start egg server to serve REST requests.
-//------------------------------------------------------------------------------
-function startEggServer(port) {
+/**
+ * Eggbank Directory server.
+ * @contructor
+ * @param {Contract} contract - The eggs contract instance.
+ * @param {Number} - The listening port number.
+ */
+function EggDirectory(contract, port) {
     var restify = require('restify');                                                                           
-
-    var name = "Consumer Egg Tracker Server"                                                                    
-
     var server = restify.createServer();                                                                        
     server.use(restify.queryParser());                                                                          
-    server.use(restify.bodyParser({mapParams: true, mapFiles: true}));              
-    
+    server.use(restify.bodyParser({mapParams: true, mapFiles: true})); 
+
+    this.server = server;
+    this.port = (port !== 'undefined') ? port : 56659;
+    this.eggsContract = contract;
+}
+
+/**
+ * Start Egg Directory server.
+ */
+EggDirectory.prototype.start = function () {
+    var _this = this;
     // -$- Get total number of eggs -$-
-    server.get('/eggs/total', function(req, res, next){ 
-        eggsContract.getEggCount(function(error, result){
+    this.server.get('/eggs/total', function(req, res, next){ 
+        _this.eggsContract.getEggCount(function(error, result){
             if (error) {
                 res.send(500, error);
                 return next();
@@ -159,15 +89,15 @@ function startEggServer(port) {
 
     // -$- Retrieve carton information by carton tag UID -$-
     var DateFormat = require('dateformat');
-    server.get('/eggs/get/:eggid', function(req, res, next) {
-        eggsContract.getCartonInfo( req.params.eggid, function(error, result) {
+    this.server.get('/eggs/get/:eggid', function(req, res, next) {
+        _this.eggsContract.getCartonInfo( req.params.eggid, function(error, result) {
             if (error) {
                 res.send(500, error);
                 return next();
             }
 
             var resCode = result[0];
-            if (resCode == NO_ERROR) {
+            if (resCode == eggerrors.NO_ERROR) {
                 var name = result[1];
                 var loc = result[2];
                 var expiration = new Date(result[3].toNumber());
@@ -178,57 +108,57 @@ function startEggServer(port) {
                     "Name": name,
                     "Location": loc,
                     "Expiration": DateFormat(expiration, "mm/dd/yyyy"),
-                    "Boxed date": DateFormat(expiration, "mm/dd/yyyy"),
+                    "Boxed date": DateFormat(boxedDate, "mm/dd/yyyy"),
                     "NoE": noe,
                     "Owner": owner
                 }, null, '\t');
                 res.send(200, json);
             } else {
-                res.send(200, "ERROR getting egg info. " + errors[resCode]);
+                res.send(200, "ERROR getting egg info. " + eggerrors.getErrorMsg(resCode));
             }
             return next();
         });
     });
     
     // -$- Dispose egg carton by carton tag UID -$-
-    server.get('/eggs/dispose/:eggid', function(req, res, next) {
+    this.server.get('/eggs/dispose/:eggid', function(req, res, next) {
         var eggid = req.params.eggid;
-        eggsContract.disposeCarton(eggid, function (error, result) {
+        _this.eggsContract.disposeCarton(eggid, function (error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
             }
-            if (result == NO_ERROR) {
+            if (result == eggerrors.NO_ERROR) {
                 res.send(200, "Egg carton " + eggid + " has been disposed.");
                 return next();
             } else {
-                res.send(200, "ERROR disposing egg carton " + eggid + ". " + errors[result]);
+                res.send(200, "ERROR disposing egg carton " + eggid + ". " + eggerrors.getErrorMsg(result));
                 return next();
             }
         });
     });
 
-    server.get('/eggs/transfer', function(req, res, next) {
+    this.server.get('/eggs/transfer', function(req, res, next) {
         var eggid = req.query.eggid;
         var newOwner = req.query.newOwner;
-        eggsContract.transferCarton(eggid, newOwner, function(error, result) {
+        _this.eggsContract.transferCarton(eggid, newOwner, function(error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
             }
-            if (result == NO_ERROR) {
+            if (result == eggerrors.NO_ERROR) {
                 res.send(200, "Egg carton " + eggid + " has been transferred to " + newOwner);
                 return next();
             } else {
-                res.send(200, "ERROR transferring egg carton " + eggid + ". " + errors[result]);
+                res.send(200, "ERROR transferring egg carton " + eggid + ". " + eggerrors.getErrorMsg(result));
                 return next();
             }
         });
     });
 
-    server.get('/eggs/get/event/:index', function (req, res, next) {
+    this.server.get('/eggs/get/event/:index', function (req, res, next) {
         var eggid = req.query.eggid;
-        eggsContract.getCartonEvent(eggid, req.params.index, function (error, result) {
+        _this.eggsContract.getCartonEvent(eggid, req.params.index, function (error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
@@ -236,7 +166,7 @@ function startEggServer(port) {
             var errCode = result[0];
             var etype = result[1];
             var actor = result[2];
-            if (errCode == NO_ERROR) {
+            if (errCode == eggerrors.NO_ERROR) {
                 var json = JSON.stringify( {
                     'etype': etype,
                     'actor': actor
@@ -245,19 +175,21 @@ function startEggServer(port) {
                 res.send(200, json);
                 return next;
             } else {
-                res.send(200, "ERROR getting event entry. " + errors[errCode]);
+                res.send(200, "ERROR getting event entry. " + eggerrors.getErrorMsg(errCode));
                 return next();
             }
         });
     });
 
-    server.listen(port);
-    console.log("server running at 0.0.0.0:"+port);
+    this.server.listen(this.port);
+    console.log("Egg directory running at 0.0.0.0:" + this.port);
 }
 
-//------------------------------------------------------------------------------
-// Determine if a tag is a egg tag or not.
-//------------------------------------------------------------------------------
+/**
+ * Determine if a tag is a egg tag or not.
+ * @param {string} tagval - The json tagdata in string format.
+ * @returns {Boolean}
+ */
 function isEggTag(tagval) {                                                     
     try {                                                                       
         jsonObj = JSON.parse(tagval);                                           
@@ -265,127 +197,171 @@ function isEggTag(tagval) {
         return false;                                                           
     }                                                                           
                                                                                 
-    return (jsonObj.hasOwnProperty('Name') && jsonObj.Name === "eggs") || 
-        (jsonObj.hasOwnProperty('name') && jsonObj.name === "eggs");           
+    return (jsonObj.hasOwnProperty('Name') && (jsonObj.Name === "eggs")) || 
+        (jsonObj.hasOwnProperty('name') && (jsonObj.name === "eggs"));           
 }    
 
-//------------------------------------------------------------------------------
-// ebb *register* command handler
-//------------------------------------------------------------------------------
-function ebbRegister(r, token) {
-    var finish = token;
+/**
+ * ebb *register* command handler
+ * @param {Object} r
+ * @param token: Placeholder for caller to pass variable.
+ */
+EbbTerminal.prototype.ebbRegister = function(r, token) {
+    var _this = token;
     var verbose = r.flags.v;
     verbose = typeof verbose !== 'undefined' ?  verbose : false;
-    scanTags(function (device, tag) {
-        if (!!tag) {
-            registerEggCarton(tag.uid, tag.json, function(error) {
-                if (error == NO_ERROR) {
-                    ebbPrintResult("Congrats! Registered egg carton  " + tag.uid);
-                } else{
-                    ebbPrintResult("ERROR registering " + tag.uid + ". " + errors[error]);
-                }           
-                finish();
-                return;
-            });
-        } else {
-            finish();
-        }
-    }, verbose);
+    return new Promise(function (resolve, reject) {
+        try {
+            nfctools.scanTags(function (device, tag) {
+                if (!!tag) {
+                    var cartonInfo = tag.json;
+                    _this.eggsContract.registerCarton(tag.uid, 
+                        cartonInfo.Name, cartonInfo.Location, 
+                        new Date(cartonInfo.Expiration).getTime(), 
+                        new Date(cartonInfo['Boxed date']).getTime(),
+                        cartonInfo.NoE, 
+                        function(error, errCode) {
+                            if (error) {
+                                console.log(error);
+                                reject(error);
+                                return;
+                            }
+                            if (errCode == eggerrors.NO_ERROR) {
+                                _this.printWithExtraLines("Congrats! Registered egg carton  " + 
+                                        tag.uid);
+                            } else{
+                                _this.printWithExtraLines("ERROR registering " + 
+                                        tag.uid + ". " + eggerrors.getErrorMsg(errCode));
+                            }           
+                            resolve("registered");
 
-}
-
-//------------------------------------------------------------------------------
-// ebb *transfer* command handler
-//------------------------------------------------------------------------------
-function ebbTransfer(r , token) {
-    var finish = token;
-    var eggid = r.args[0];
-    var to = r.parameters.target;
-    
-    eggsContract.transferCarton(eggid, to, function (error, result) {
-        if (error) {
-            console.log(error);
+                    });
+                } else {
+                    resolve("failed registration");
+                }
+            }, verbose);
+        } catch (e) {
+            resolve("unknown error!");
         }
-        if (result == NO_ERROR) {
-            ebbPrintResult("Egg carton " + eggid + " has been transferred to " + to);
-        } else {
-            ebbPrintResult("ERROR transferring egg carton " + eggid + ". " + errors[result]);
-        }
-        finish();
-        return;
-    });   
-}
-
-//------------------------------------------------------------------------------
-// ebb *dispose* command handler
-//------------------------------------------------------------------------------
-function ebbDispose(r, token) {
-    var finish = token;
-    var eggid = r.args[0];
-    eggsContract.disposeCarton(eggid, function (error, result) {
-        if (error) {
-            console.log(error);
-        } else {
-            if (result == NO_ERROR) {
-                ebbPrintResult("Egg carton " + eggid + " has been disposed.");
-            } else {
-                ebbPrintResult("ERROR disposing egg carton " + eggid + ". " + errors[result]);
-            }
-        }
-        finish();
-        return;
     });
 
 }
 
-//------------------------------------------------------------------------------
-// ebb *help* command heandler
-//------------------------------------------------------------------------------
-function ebbHelp(r, token) {
-    ebbPrintResult(r.help());
-    token();
+/**
+ * ebb *transfer* command handler
+ */
+EbbTerminal.prototype.ebbTransfer = function(r , token) {
+    var _this = token;
+    var eggid = r.args[0];
+    var to = r.parameters.target;
+    return new Promise(function (resolve, reject) { 
+        _this.eggsContract.transferCarton(eggid, to, function (error, result) {
+            if (error) {
+                console.log(error);
+                reject(error);
+            }
+
+            if (result == eggerrors.NO_ERROR) {
+                _this.printWithExtraLines("Egg carton " + eggid + 
+                        " has been transferred to " + to);
+                resolve("transferred");
+            } else {
+                _this.printWithExtraLines("ERROR transferring egg carton " + 
+                        eggid + ". " + eggerrors.getErrorMsg(result));
+                resolve("failed transferring");
+            }
+        });   
+    });
 }
 
-//
-function ebbPrintResult(result) {
+/**
+ * ebb *dispose* command handler
+ */
+EbbTerminal.prototype.ebbDispose = function (r, token) {
+    var _this = token;
+    var eggid = r.args[0];
+    return new Promise(function(resolve, reject) {
+        _this.eggsContract.disposeCarton(eggid, function (error, result) {
+            if (error) {
+                console.log(error);
+                reject(error);
+            } else {
+                if (result == eggerrors.NO_ERROR) {
+                    _this.printWithExtraLines("Egg carton " + eggid + " has been disposed.");
+                    resolve("disposed");
+                } else {
+                    _this.printWithExtraLines("ERROR disposing egg carton " + 
+                            eggid + ". " + eggerrors.getErrorMsg(result));
+                    resolve("error disposing");
+                }
+            }
+        });
+    });
+
+}
+
+/**
+ * ebb *help* command heandler
+ */
+EbbTerminal.prototype.ebbHelp = function (r, token) {
+    var _this = token;
+    _this.printWithExtraLines(r.help());
+    return new Promise(function (resolve, reject) {
+        resolve("help");
+    });
+}
+
+/**
+ * ebb customized output print function.
+ */
+EbbTerminal.prototype.printWithExtraLines = function(result) {
     console.log();
     console.log(result);
     console.log();
 }
 
-function ebbProvision(r, token) {
-    var finish = token;
+/**
+ * ebb *provision* command handler.
+ */
+EbbTerminal.prototype.ebbProvision = function (r, token) {
+    var _this = token;
     var jsonFile = r.args[0];
     var jsondata = fs.readFileSync(jsonFile, 'utf-8');
-    if (!isEggTag(jsondata)) {
-        console.log("Error, not a egg tag json file!");
-        finish();
-        return;
-    } 
-    console.log(JSON.parse(jsondata));
-    var buf = nfctools.makeTextTagBuffer(jsondata);
-    console.log(buf);
-    try {
-        var nfc = require('nfc').nfc;
-        var devices = nfc.scan();
-        for (var deviceID in devices) {
-            var nfcdev = new nfc.NFC();                                                                             
-            nfcdev.start(deviceID); 
-            var np = nfcdev.write(buf);
-            console.log("Wrote " + np + " pages");
+    return new Promise(function (resolve, reject) {
+        if (!isEggTag(jsondata)) {
+            console.log("Error, not a egg tag json file!");
+            resolve("failed provision: is not a egg tag");
+        } 
+
+        console.log(JSON.parse(jsondata));
+        var buf = nfctools.makeTextTagBuffer(jsondata);
+        try {
+            var nfc = require('nfc').nfc;
+            var devices = nfc.scan();
+            for (var deviceID in devices) {
+                var nfcdev = new nfc.NFC();                                                                             
+                nfcdev.start(deviceID); 
+                var np = nfcdev.write(buf);
+                console.log("Wrote " + np + " pages");
+                resolve("provisioned");
+            }
+        } catch (e) {
+            console.log(e);
+            reject("failed provision");
         }
-    } catch (e) {
-        console.log(e);
-    }
-    finish();
+    });
 
 }
 
-//------------------------------------------------------------------------------
-// Start eggbank blockchain bridge terminal app
-//------------------------------------------------------------------------------
-function startEggTerminal() {
-    var lineparser = require('lineparser');
+/**
+ * Eggbank Blockchain Bridge (EBB) terminal app
+ * @constructor
+ * @param {Contract} contract - The eggs contract instance.
+ */
+    
+function EbbTerminal(contract) {
+    this.eggsContract = contract;
+    var lineparser = require('lineparser-promised');
     var meta = {
         program: "ebb",
         name: "Eggbank Blockchain Bridge",
@@ -395,7 +371,7 @@ function startEggTerminal() {
             flags: [
                 // -$- short_name, name, description -$-
                 [ 'h', 'help', 'print program usage' ],
-                [ 'v', 'verbose', 'print detailed information' ]
+            [ 'v', 'verbose', 'print detailed information' ]
             ],
             parameters: [
                 // -$- short_name, name, description, default_value -$-
@@ -404,108 +380,78 @@ function startEggTerminal() {
         },
         usages: [
             // -$- subcommand, options, positional-arguments, description, handler -$-
-            ['provision', null, ['json file'], 'Provision a tag with provided json file.', ebbProvision],
-            ['register', ['[v]'], null, 'Register egg carton to eggchain.', ebbRegister],
-            ['transfer', ['[target]'], ['uid'], 'Transfer egg carton.', ebbTransfer],
-            ['dispose', null, ['uid'], 'Dispose egg carton.', ebbDispose],
-            ['help', null, null, 'help', ebbHelp],
-            [null, null, null, 'help', ebbHelp]
+            ['provision', null, ['json file'], 'Provision a tag with provided json file.', this.ebbProvision],
+            ['register', ['[v]'], null, 'Register egg carton to eggchain.', this.ebbRegister],
+            ['transfer', ['[target]'], ['uid'], 'Transfer egg carton.', this.ebbTransfer],
+            ['dispose', null, ['uid'], 'Dispose egg carton.', this.ebbDispose],
+            ['help', null, null, 'help', this.ebbHelp],
+            [null, null, null, 'help', this.ebbHelp]
         ]
     };
 
-    var optparser = lineparser.init(meta);
-    var argsparser = require('shell-quote').parse;
-    var prompt = require('prompt-sync')({
+    //var promise = require('bluebird');
+    this.optparser = lineparser.init(meta);
+    this.argsparser = require('shell-quote').parse;
+    //promise.pro
+    this.prompt = require('prompt-sync')({
         history: require('prompt-sync-history')('prompt_history.txt', 100)
     });
-    var sleep = require('sleep-async')();
+    this.sleep = require('sleep-async')();
     
-    function ebbTerminal() {
-        var cmdline = prompt('ebb > ', 'help');
-        if (cmdline == 'exit') {
-            prompt.history.save();
-            return;
-        }
-        
-        // -$- Synchronizing of callback function and terminal -$-
-        // TODO[fix]: `sleepWithCondition` return delayed on second pass of recursion.
-        var finished = false;
-        function finish() {
-            finished = true;
-        }
-        function hasFinished() {
-            return finished ? true : false;
-        }
-
-        try {
-            optparser.parse(argsparser(cmdline), finish);
-            var timeoutopts = {
-                sleep: 120000,  // 5min
-                interval: 500   // 1/2sec
-            };
-            sleep.sleepWithCondition(hasFinished, timeoutopts, ebbTerminal);
-        } catch (e) {
-            ebbTerminal();
-        }
-    }
-    ebbTerminal();
 }
 
-//-$- Main entry -$-
-var args = process.argv.slice(2);
-var account = typeof args[1] !== 'undefined' ? args[1] : 'developer_000';
-loadEggContract(account);
+/**
+ * The terminal command parsing function
+ * @param {EggTerminal) ctx - The EggTerminal instance as context.
+ */
+EbbTerminal.prototype.terminal = function(ctx) {
+    var _this = ctx;
+    var cmdline = _this.prompt('ebb > ', 'help');
+    if (cmdline == 'exit') {
+        _this.prompt.history.save();
+        return;
+    }
 
-if (args.length > 0) {
-    if (args[0] == "server") {
-        var port = typeof args[2] != 'undefined' ? args[2] : 56659;
-        startEggServer(port);
+    _this.optparser.parse(_this.argsparser(cmdline), _this).then(function (res) {
+        _this.terminal(ctx);
+    });
+}
+
+/**
+ * Start the terminal app.
+ */
+EbbTerminal.prototype.start = function() {
+    this.terminal(this);
+} 
+
+
+/**
+ * The eggbank app entry.
+ */
+function eggbank() {
+    var args = process.argv.slice(2);
+    var account = typeof args[1] !== 'undefined' ? args[1] : 'developer_000';
+    var eggsContract = loadEggContract(account);
+
+    if (args[0] == "directory") {
+        var port = 56659;
+        if (args.length > 2)
+            var port = typeof args[2] != 'undefined' ? args[2] : 56659;
+        var ED = new EggDirectory(eggsContract, port);
+        ED.start();
     }
     else if (args[0] == "terminal") {
-        startEggTerminal();
+        var ET = new EbbTerminal(eggsContract);
+        ET.start();
     }
-} else {
-    var nfc  = require('nfc').nfc;
-
-    var devices = nfc.scan();
-    for (var deviceID in devices) {
-         //read(deviceID);
-         var nfcdev = new nfc.NFC();                                                                             
-         nfcdev.start(deviceID);                                                                                 
-         nfc.readTag(nfcdev, function(tagdata) {                                                                 
-             // -$- Manufacture block -$-                                                
-             manudata = nfc.parseManufactureBlk(tagdata.slice(0, 16));                   
-             console.log("uid: " + nfc.bufToHexString(new Buffer(manudata.uid), ' '));       
-             console.log("check byte 0: " + ('0' + manudata.cb0.toString(16)).substr(-2));
-             console.log("check byte 1: " + ('0' + manudata.cb1.toString(16)).substr(-2));
-             console.log("internal: " + ('0' + manudata.internal.toString(16)).substr(-2));
-             console.log("lock bytes: " + nfc.bufToHexString(new Buffer(manudata.lock), ' '));
-             console.log("capability container: " + nfc.bufToHexString(new Buffer(manudata.cc), ' '));
-             console.log();                                                                                      
-
-             // -$- Read JSON data -$-                                                   
-             var tlvs = nfc.parse(tagdata.slice(16));                                                            
-             tagval = tlvs[0].ndef[0].value;                                                                     
-             console.log("Original text: " + tagval);                                                            
-             if (!isEggTag(tagval)) {                                                                            
-                 console.log("It's not an egg carton tag!!!");
-                 nfcdev.stop();                                                                                  
-                 return;                                                                                         
-             }                                                                                                   
-
-             var infoObj = JSON.parse(tagval);                                                                       
-             var cartonUID = nfc.bufToHexString(new Buffer(manudata.uid), '');
-             registerEggCarton(cartonUID, infoObj, function (errCode) {
-                 if (errCode == NO_ERROR) {
-                     console.log("Congrats! Registered egg carton  " + cartonUID);
-                 } else{
-                     console.log("ERROR registering " + cartonUID + ". " + errors[errCode]);
-                 }
-             });
-
-             nfcdev.stop();
-         });
+    else {
+        console.log('Eggbank usage:');
+        console.log('sudo node eggbank.js terminal - Start Eggbank Blockchain Bridge (ebb) app.');
+        console.log('node eggbank.js directory - Start Eggbank Directory (ED) app.');
     }
+
 }
+
+eggbank();
 
 
