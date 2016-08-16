@@ -1,5 +1,7 @@
+/**
+ * Error definitions.
+ */
 
-// -$- Eggbank error definitions -$-
 exports.NO_ERROR = 0;
 exports.RESOURCE_NOT_FOUND = 1001;
 exports.RESOURCE_ALREADY_EXISTS = 1002;
@@ -13,6 +15,11 @@ errors[this.RESOURCE_ALREADY_EXISTS] = "Resource already exists";
 errors[this.ACCESS_DENIED] = "Access denied";
 errors[this.ARRAY_INDEX_OUT_OF_BOUNDS] = "Index out of bounds";
 
+/**
+ * Get error message by error ID.
+ * @param {Number} errCode - The code of the error.
+ * @returns {string} - The error details.
+ */
 exports.getErrorMsg = function (errCode) {
     try  {
         return errors[errCode];

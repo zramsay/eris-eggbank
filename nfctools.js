@@ -37,12 +37,11 @@ exports.makeTextTagBuffer = function(text) {
     return buf;
 }
 
-//------------------------------------------------------------------------------
-//  Scan RFID/NFC tag
-//  Args:
-//    callback: callback function with {uid, json} dictionary obj as params.
-//    verbose(bool): Display tag details or not.
-//------------------------------------------------------------------------------
+/**
+ * Scan RFID/NFC tag
+ * @param callback
+ * @param {Boolean} verbose - Print tag details or not.
+ */
 exports.scanTags = function (callback, verbose) {
     var nfc = require('nfc').nfc;
 
@@ -79,6 +78,7 @@ exports.scanTags = function (callback, verbose) {
                     });
 
                 } catch (e) {                                                               
+                    console.log(e);
                     console.log("It's not a carton tag!!!");
                     nfcdev.stop();                                                                                  
                     callback(nfcdev, null);
@@ -91,3 +91,5 @@ exports.scanTags = function (callback, verbose) {
         }
     }
 }
+
+

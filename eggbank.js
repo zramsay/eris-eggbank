@@ -1,7 +1,6 @@
-/*
-********************************************************************************
-*   eggs bank on the blockchain
-*******************************************************************************/
+/**
+ * Eggbank on the blockchain
+ */
 
 var fs = require ('fs')
     , util = require('util')
@@ -14,11 +13,13 @@ var erisC = require('eris-contracts')
 var nfctools = require('./nfctools.js');
 var eggerrors = require('./eggerrors.js');
 
-var eggsContract;
-//------------------------------------------------------------------------------
-// Load eggbank contract with contract manager account.
-//------------------------------------------------------------------------------
+/**
+ * Load eggbank contract with contract manager account.
+ * @param {string} account - The name of the contract manager account.
+ * @returns {Contract}
+ */
 function loadEggContract(account) {
+    var eggsContract;
     var appName = "eggbank"
         , chainName = "eggchain"
         ;
@@ -47,27 +48,35 @@ function loadEggContract(account) {
     //-$- properly instantiate the contract objects using the abi and address -$-
     eggsContract = contractsManager.newContractFactory(eggsAbi)
         .at(eggsContractAddress);
+    return eggsContract;
 
 }
 
-
-function EggDirectory(port) {
+/**
+ * Eggbank Directory server.
+ * @contructor
+ * @param {Contract} contract - The eggs contract instance.
+ * @param {Number} - The listening port number.
+ */
+function EggDirectory(contract, port) {
     var restify = require('restify');                                                                           
-
-    var name = "Consumer Egg Tracker Server"                                                                    
-
     var server = restify.createServer();                                                                        
     server.use(restify.queryParser());                                                                          
     server.use(restify.bodyParser({mapParams: true, mapFiles: true})); 
+
     this.server = server;
     this.port = (port !== 'undefined') ? port : 56659;
+    this.eggsContract = contract;
 }
 
+/**
+ * Start Egg Directory server.
+ */
 EggDirectory.prototype.start = function () {
-
+    var _this = this;
     // -$- Get total number of eggs -$-
     this.server.get('/eggs/total', function(req, res, next){ 
-        eggsContract.getEggCount(function(error, result){
+        _this.eggsContract.getEggCount(function(error, result){
             if (error) {
                 res.send(500, error);
                 return next();
@@ -81,7 +90,7 @@ EggDirectory.prototype.start = function () {
     // -$- Retrieve carton information by carton tag UID -$-
     var DateFormat = require('dateformat');
     this.server.get('/eggs/get/:eggid', function(req, res, next) {
-        eggsContract.getCartonInfo( req.params.eggid, function(error, result) {
+        _this.eggsContract.getCartonInfo( req.params.eggid, function(error, result) {
             if (error) {
                 res.send(500, error);
                 return next();
@@ -114,7 +123,7 @@ EggDirectory.prototype.start = function () {
     // -$- Dispose egg carton by carton tag UID -$-
     this.server.get('/eggs/dispose/:eggid', function(req, res, next) {
         var eggid = req.params.eggid;
-        eggsContract.disposeCarton(eggid, function (error, result) {
+        _this.eggsContract.disposeCarton(eggid, function (error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
@@ -132,7 +141,7 @@ EggDirectory.prototype.start = function () {
     this.server.get('/eggs/transfer', function(req, res, next) {
         var eggid = req.query.eggid;
         var newOwner = req.query.newOwner;
-        eggsContract.transferCarton(eggid, newOwner, function(error, result) {
+        _this.eggsContract.transferCarton(eggid, newOwner, function(error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
@@ -149,7 +158,7 @@ EggDirectory.prototype.start = function () {
 
     this.server.get('/eggs/get/event/:index', function (req, res, next) {
         var eggid = req.query.eggid;
-        eggsContract.getCartonEvent(eggid, req.params.index, function (error, result) {
+        _this.eggsContract.getCartonEvent(eggid, req.params.index, function (error, result) {
             if (error) {
                 res.send(500, error);
                 return next;
@@ -172,13 +181,15 @@ EggDirectory.prototype.start = function () {
         });
     });
 
-    this.server.listen(port);
-    console.log("server running at 0.0.0.0:"+port);
+    this.server.listen(this.port);
+    console.log("Egg directory running at 0.0.0.0:" + this.port);
 }
 
-//------------------------------------------------------------------------------
-// Determine if a tag is a egg tag or not.
-//------------------------------------------------------------------------------
+/**
+ * Determine if a tag is a egg tag or not.
+ * @param {string} tagval - The json tagdata in string format.
+ * @returns {Boolean}
+ */
 function isEggTag(tagval) {                                                     
     try {                                                                       
         jsonObj = JSON.parse(tagval);                                           
@@ -190,32 +201,37 @@ function isEggTag(tagval) {
         (jsonObj.hasOwnProperty('name') && (jsonObj.name === "eggs"));           
 }    
 
-//------------------------------------------------------------------------------
-// ebb *register* command handler
-//------------------------------------------------------------------------------
+/**
+ * ebb *register* command handler
+ * @param {Object} r
+ * @param token: Placeholder for caller to pass variable.
+ */
 EbbTerminal.prototype.ebbRegister = function(r, token) {
     var _this = token;
     var verbose = r.flags.v;
     verbose = typeof verbose !== 'undefined' ?  verbose : false;
-
     return new Promise(function (resolve, reject) {
         try {
             nfctools.scanTags(function (device, tag) {
                 if (!!tag) {
                     var cartonInfo = tag.json;
-                    eggsContract.registerCarton(tag.uid, cartonInfo.Name, cartonInfo.Location, 
+                    _this.eggsContract.registerCarton(tag.uid, 
+                        cartonInfo.Name, cartonInfo.Location, 
                         new Date(cartonInfo.Expiration).getTime(), 
                         new Date(cartonInfo['Boxed date']).getTime(),
-                        cartonInfo.NoE, function(error, errCode) {
+                        cartonInfo.NoE, 
+                        function(error, errCode) {
                             if (error) {
                                 console.log(error);
                                 reject(error);
                                 return;
                             }
                             if (errCode == eggerrors.NO_ERROR) {
-                                _this.printWithExtraLines("Congrats! Registered egg carton  " + tag.uid);
+                                _this.printWithExtraLines("Congrats! Registered egg carton  " + 
+                                        tag.uid);
                             } else{
-                                _this.printWithExtraLines("ERROR registering " + tag.uid + ". " + eggerrors.getErrorMsg(errCode));
+                                _this.printWithExtraLines("ERROR registering " + 
+                                        tag.uid + ". " + eggerrors.getErrorMsg(errCode));
                             }           
                             resolve("registered");
 
@@ -231,39 +247,41 @@ EbbTerminal.prototype.ebbRegister = function(r, token) {
 
 }
 
-//------------------------------------------------------------------------------
-// ebb *transfer* command handler
-//------------------------------------------------------------------------------
+/**
+ * ebb *transfer* command handler
+ */
 EbbTerminal.prototype.ebbTransfer = function(r , token) {
     var _this = token;
     var eggid = r.args[0];
     var to = r.parameters.target;
     return new Promise(function (resolve, reject) { 
-        eggsContract.transferCarton(eggid, to, function (error, result) {
+        _this.eggsContract.transferCarton(eggid, to, function (error, result) {
             if (error) {
                 console.log(error);
                 reject(error);
             }
 
             if (result == eggerrors.NO_ERROR) {
-                _this.printWithExtraLines("Egg carton " + eggid + " has been transferred to " + to);
+                _this.printWithExtraLines("Egg carton " + eggid + 
+                        " has been transferred to " + to);
                 resolve("transferred");
             } else {
-                _this.printWithExtraLines("ERROR transferring egg carton " + eggid + ". " + eggerrors.getErrorMsg(result));
+                _this.printWithExtraLines("ERROR transferring egg carton " + 
+                        eggid + ". " + eggerrors.getErrorMsg(result));
                 resolve("failed transferring");
             }
         });   
     });
 }
 
-//------------------------------------------------------------------------------
-// ebb *dispose* command handler
-//------------------------------------------------------------------------------
+/**
+ * ebb *dispose* command handler
+ */
 EbbTerminal.prototype.ebbDispose = function (r, token) {
     var _this = token;
     var eggid = r.args[0];
     return new Promise(function(resolve, reject) {
-        eggsContract.disposeCarton(eggid, function (error, result) {
+        _this.eggsContract.disposeCarton(eggid, function (error, result) {
             if (error) {
                 console.log(error);
                 reject(error);
@@ -272,7 +290,8 @@ EbbTerminal.prototype.ebbDispose = function (r, token) {
                     _this.printWithExtraLines("Egg carton " + eggid + " has been disposed.");
                     resolve("disposed");
                 } else {
-                    _this.printWithExtraLines("ERROR disposing egg carton " + eggid + ". " + eggerrors.getErrorMsg(result));
+                    _this.printWithExtraLines("ERROR disposing egg carton " + 
+                            eggid + ". " + eggerrors.getErrorMsg(result));
                     resolve("error disposing");
                 }
             }
@@ -281,9 +300,9 @@ EbbTerminal.prototype.ebbDispose = function (r, token) {
 
 }
 
-//------------------------------------------------------------------------------
-// ebb *help* command heandler
-//------------------------------------------------------------------------------
+/**
+ * ebb *help* command heandler
+ */
 EbbTerminal.prototype.ebbHelp = function (r, token) {
     var _this = token;
     _this.printWithExtraLines(r.help());
@@ -292,13 +311,18 @@ EbbTerminal.prototype.ebbHelp = function (r, token) {
     });
 }
 
-//
+/**
+ * ebb customized output print function.
+ */
 EbbTerminal.prototype.printWithExtraLines = function(result) {
     console.log();
     console.log(result);
     console.log();
 }
 
+/**
+ * ebb *provision* command handler.
+ */
 EbbTerminal.prototype.ebbProvision = function (r, token) {
     var _this = token;
     var jsonFile = r.args[0];
@@ -329,12 +353,14 @@ EbbTerminal.prototype.ebbProvision = function (r, token) {
 
 }
 
-//------------------------------------------------------------------------------
-// Start eggbank blockchain bridge terminal app
-//------------------------------------------------------------------------------
+/**
+ * Eggbank Blockchain Bridge (EBB) terminal app
+ * @constructor
+ * @param {Contract} contract - The eggs contract instance.
+ */
     
-function EbbTerminal() {
-    this.finished = false;
+function EbbTerminal(contract) {
+    this.eggsContract = contract;
     var lineparser = require('lineparser-promised');
     var meta = {
         program: "ebb",
@@ -374,7 +400,10 @@ function EbbTerminal() {
     
 }
 
-
+/**
+ * The terminal command parsing function
+ * @param {EggTerminal) ctx - The EggTerminal instance as context.
+ */
 EbbTerminal.prototype.terminal = function(ctx) {
     var _this = ctx;
     var cmdline = _this.prompt('ebb > ', 'help');
@@ -388,31 +417,41 @@ EbbTerminal.prototype.terminal = function(ctx) {
     });
 }
 
-
+/**
+ * Start the terminal app.
+ */
 EbbTerminal.prototype.start = function() {
     this.terminal(this);
 } 
 
 
-//-$- Main entry -$-
-var args = process.argv.slice(2);
-var account = typeof args[1] !== 'undefined' ? args[1] : 'developer_000';
-loadEggContract(account);
+/**
+ * The eggbank app entry.
+ */
+function eggbank() {
+    var args = process.argv.slice(2);
+    var account = typeof args[1] !== 'undefined' ? args[1] : 'developer_000';
+    var eggsContract = loadEggContract(account);
 
-if (args[0] == "directory") {
-    var port = 56659;
-    if (args.length > 2)
-        var port = typeof args[2] != 'undefined' ? args[2] : 56659;
-    var ED = new EggDirectory(port);
-    ED.start();
+    if (args[0] == "directory") {
+        var port = 56659;
+        if (args.length > 2)
+            var port = typeof args[2] != 'undefined' ? args[2] : 56659;
+        var ED = new EggDirectory(eggsContract, port);
+        ED.start();
+    }
+    else if (args[0] == "terminal") {
+        var ET = new EbbTerminal(eggsContract);
+        ET.start();
+    }
+    else {
+        console.log('Eggbank usage:');
+        console.log('sudo node eggbank.js terminal - Start Eggbank Blockchain Bridge (ebb) app.');
+        console.log('node eggbank.js directory - Start Eggbank Directory (ED) app.');
+    }
+
 }
-else if (args[0] == "terminal") {
-    var ET = new EbbTerminal();
-    ET.start();
-}
-else {
-    console.log('Eggbank usage:');
-    console.log('sudo node eggbank.js terminal - Start Eggbank Blockchain Bridge (ebb) app.');
-    console.log('node eggbank.js directory - Start Eggbank Directory (ED) app.');
-}
+
+eggbank();
+
 
