@@ -1,6 +1,6 @@
 
-# eggbank
-'EggBank' on a Chain - Eris/IoT
+# Eggbank
+'Eggbank' on a Chain - Eris/IoT
 
 ## Hardware Platform
 * Raspberry Pi 2/Pi 3
@@ -9,9 +9,12 @@
 
 [Amazon NFC stickers]: https://www.amazon.com/gp/product/B01D8RDNZ0/ref=oh_aui_detailpage_o07_s00?ie=UTF8&psc=1
 
-## Software Requirements
+## Blockchain 
 * [eris](https://erisindustries.com/)
-* [node-nfc](https://github.com/camme/node-nfc)
+
+## Software Dependencies
+* [node-nfc](https://github.com/shuangjj/node-nfc)
+* [lineparser-promised](https://github.com/shuangjj/lineparser-promised) 
 
 ## Get Started
 
@@ -25,16 +28,18 @@ According to the help information, you can type in the `node eggbank.js director
 to run a `Egg Directory` server for serving REST requests. And use `sudo eggank.js terminal` 
 to interact with eggbank blockchain using commands interfaces.
 
-And the big picture for the use case of eggbank is shown as below
+And the big picture for the use case of eggbank is shown below
 <img src="/imgs/eggbank.png" width="500" alt="Eggbank Use Case">
 
 ### Eggbank Directory
+The Direcory server is used to check the eggs on the `eggchain` using the REST requests. 
+The server works as an agent to delivery commands to the `eggchain`.
 ```bash
 node eggbank.js directory [contract_manager_account_name] [port_number]
 ```
 
 The default contract management accout is `developer_000` and default port number is `56659`. 
-The following is the supported REST requests.
+The following is the supported REST APIs.
 
 * Get current egg count 
 
@@ -56,8 +61,12 @@ The following is the supported REST requests.
 
   http://{SERVER_IP}:{PORT}/eggs/get/event/{EVENTID}
 
+* Get user info
+  
+  http://{SERVER_IP}:{PORT}/users/get/{USER_ADDRESS}
+
 Since `dispose` and `transfer` needs the user to be authorized user, the two open REST APIs 
-will be deprecated aftewards.
+will be deprecated later.
 
 ### Eggbank Blockchain Bridge (ebb)
 ```bash

@@ -81,7 +81,7 @@ EggDirectory.prototype.start = function () {
                 res.send(500, error);
                 return next();
             }
-            res.send(200, "You have " + result.toNumber() + " eggs.")
+            res.send(200, "Egg bank has " + result.toNumber() + " eggs.")
             console.log("Egg number now is:\t\t\t" + result.toNumber());
             return next()
         });
@@ -100,13 +100,17 @@ EggDirectory.prototype.start = function () {
             if (resCode == eggerrors.NO_ERROR) {
                 var name = result[1];
                 var loc = result[2];
-                var expiration = new Date(result[3].toNumber());
-                var boxedDate = new Date(result[4].toNumber());
-                var noe = result[5].toNumber;
-                var owner = result[6];
+                var type = result[3];
+                var color = result[4];
+                var expiration = new Date(result[5].toNumber());
+                var boxedDate = new Date(result[6].toNumber());
+                var noe = result[7].toNumber;
+                var owner = result[8];
                 var json = JSON.stringify( {
                     "Name": name,
                     "Location": loc,
+                    "Type": type,
+                    "Color": color,
                     "Expiration": DateFormat(expiration, "mm/dd/yyyy"),
                     "Boxed date": DateFormat(boxedDate, "mm/dd/yyyy"),
                     "NoE": noe,
@@ -115,6 +119,24 @@ EggDirectory.prototype.start = function () {
                 res.send(200, json);
             } else {
                 res.send(200, "ERROR getting egg info. " + eggerrors.getErrorMsg(resCode));
+            }
+            return next();
+        });
+    });
+
+    this.server.get('/users/get/:userAddr', function (req, res, next) {
+        var userAddr = req.params.userAddr;
+        _this.eggsContract.getUserInfo(userAddr, function (error, result) {
+            if (error) {
+                res.send(500, error);
+                return next;
+            }
+            var errCode = result[0];
+            if (errCode == eggerrors.NO_ERROR) {
+                var noe = result[1]; 
+                res.send(200, "You have " + noe + " eggs");
+            } else {
+                res.send(200, "Error getting user info. " + eggerrors.getErrorMsg(errCode));
             }
             return next();
         });
@@ -216,7 +238,8 @@ EbbTerminal.prototype.ebbRegister = function(r, token) {
                 if (!!tag) {
                     var cartonInfo = tag.json;
                     _this.eggsContract.registerCarton(tag.uid, 
-                        cartonInfo.Name, cartonInfo.Location, 
+                        cartonInfo.Name, cartonInfo.Location, cartonInfo.Type,
+                        cartonInfo.Color,
                         new Date(cartonInfo.Expiration).getTime(), 
                         new Date(cartonInfo['Boxed date']).getTime(),
                         cartonInfo.NoE, 
@@ -396,7 +419,6 @@ function EbbTerminal(contract) {
     this.prompt = require('prompt-sync')({
         history: require('prompt-sync-history')('prompt_history.txt', 100)
     });
-    this.sleep = require('sleep-async')();
     
 }
 
@@ -408,11 +430,11 @@ EbbTerminal.prototype.terminal = function(ctx) {
     var _this = ctx;
     var cmdline = _this.prompt('ebb > ', 'help');
     if (cmdline == 'exit') {
-        _this.prompt.history.save();
         return;
     }
 
     _this.optparser.parse(_this.argsparser(cmdline), _this).then(function (res) {
+        _this.prompt.history.save();
         _this.terminal(ctx);
     });
 }

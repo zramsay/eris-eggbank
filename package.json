@@ -10,7 +10,7 @@
     "lineparser-promised": "1.0.0",
     "prompt-sync": "4.1.4",
     "prompt-sync-history": "1.0.1",
-    "shell-quote": "1.6.1",
+    "shell-quote": "1.6.1"
   },
   "repository": {
     "type": "git",
