@@ -1,5 +1,6 @@
 
 # DEPRECATED
+See https://github.com/eris-ltd/hello-eris
 
 # Eggbank
 'Eggbank' on a Chain - Eris/IoT
