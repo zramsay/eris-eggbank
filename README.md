@@ -1,4 +1,6 @@
 
+# DEPRECATED
+
 # Eggbank
 'Eggbank' on a Chain - Eris/IoT
 
